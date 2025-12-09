@@ -1,0 +1,5 @@
+{
+  "name": "MuseAI Stream",
+  "description": "A smart music streaming application powered by Gemini for vibe-based search and specific music API integration.",
+  "requestFramePermissions": []
+}
