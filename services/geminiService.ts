@@ -1,16 +1,51 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
 const apiKey = process.env.API_KEY || '';
+export const isGeminiConfigured = Boolean(apiKey);
 
-// Initialize safely, assuming the key might be missing during initial dev until injected
-let ai: GoogleGenAI | null = null;
-if (apiKey) {
-  ai = new GoogleGenAI({ apiKey: apiKey });
-}
+type GeminiModule = typeof import("@google/genai");
+type GeminiClient = InstanceType<GeminiModule["GoogleGenAI"]>;
+
+let geminiModulePromise: Promise<GeminiModule | null> | null = null;
+let geminiClientPromise: Promise<GeminiClient | null> | null = null;
+
+const loadGeminiModule = async (): Promise<GeminiModule | null> => {
+  if (!isGeminiConfigured) {
+    return null;
+  }
+
+  if (!geminiModulePromise) {
+    geminiModulePromise = import("@google/genai")
+      .then((module) => module)
+      .catch((error) => {
+        console.error("Failed to load Gemini SDK:", error);
+        geminiModulePromise = null;
+        return null;
+      });
+  }
+
+  return geminiModulePromise;
+};
+
+const getGeminiClient = async (): Promise<GeminiClient | null> => {
+  if (!isGeminiConfigured) {
+    return null;
+  }
+
+  if (!geminiClientPromise) {
+    geminiClientPromise = loadGeminiModule().then((module) => {
+      if (!module) {
+        return null;
+      }
+
+      return new module.GoogleGenAI({ apiKey });
+    });
+  }
+
+  return geminiClientPromise;
+};
 
 export const getSmartSearchTerms = async (userPrompt: string): Promise<string[]> => {
-  if (!ai) {
-    console.error("Gemini API key is missing");
+  const [ai, gemini] = await Promise.all([getGeminiClient(), loadGeminiModule()]);
+  if (!ai || !gemini) {
     return [userPrompt];
   }
 
@@ -30,8 +65,8 @@ export const getSmartSearchTerms = async (userPrompt: string): Promise<string[]>
         systemInstruction: systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
+          type: gemini.Type.ARRAY,
+          items: { type: gemini.Type.STRING },
         }
       }
     });
@@ -49,15 +84,16 @@ export const getSmartSearchTerms = async (userPrompt: string): Promise<string[]>
 };
 
 export const getMusicTrivia = async (songName: string, artist: string): Promise<string> => {
-    if (!ai) return "AI Key missing.";
+    const ai = await getGeminiClient();
+    if (!ai) return "";
 
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: `Tell me a fun, one-sentence trivia fact about the song "${songName}" by ${artist}. Keep it under 20 words.`,
         });
-        return response.text || "Enjoy the music!";
+        return response.text || "";
     } catch (e) {
-        return "Enjoy the music!";
+        return "";
     }
 }

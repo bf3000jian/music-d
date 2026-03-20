@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { Song } from './types';
 import { searchMusic } from './services/musicApi';
-import { getSmartSearchTerms } from './services/geminiService';
+import { getSmartSearchTerms, isGeminiConfigured } from './services/geminiService';
 import { SongList } from './components/SongList';
 import { Player } from './components/Player';
 import { RateLimitIndicator } from './components/RateLimitIndicator';
-import { SOURCES, DEFAULT_SOURCE, SUPPORTED_SOURCES, RESULTS_LIMIT } from './constants';
-import { Search, Sparkles, Loader2, Music2, Plus, X, Check, ChevronDown } from 'lucide-react';
+import { SOURCES, DEFAULT_SOURCE, SUPPORTED_SOURCES } from './constants';
+import { Search, Sparkles, Loader2, Music2, Plus, X, ChevronDown } from 'lucide-react';
 
 const App: React.FC = () => {
   const [query, setQuery] = useState('');
@@ -35,6 +35,7 @@ const App: React.FC = () => {
 
   // Keep track of the current search request to cancel it if a new one starts
   const searchAbortControllerRef = useRef<AbortController | null>(null);
+  const canUseAi = isGeminiConfigured;
 
   const handleSearch = async (overrideQuery?: string) => {
     const q = overrideQuery || query;
@@ -61,7 +62,7 @@ const App: React.FC = () => {
     setExecutedQuery(q);
 
     try {
-      if (isAiMode && !overrideQuery) {
+      if (isAiMode && !overrideQuery && canUseAi) {
         // AI Vibe Search
         const suggestions = await getSmartSearchTerms(q);
         if (controller.signal.aborted) return;
@@ -71,15 +72,17 @@ const App: React.FC = () => {
         if (suggestions.length > 0) {
            const firstSuggestion = suggestions[0];
            setExecutedQuery(firstSuggestion); // Update executed query to the actual term used
-           const results = await searchMusic(firstSuggestion, activeSource, 1, controller.signal);
+           const { songs: results, hasMore: nextHasMore } = await searchMusic(firstSuggestion, activeSource, 1, controller.signal);
            setSongs(results);
-           setHasMore(results.length === RESULTS_LIMIT);
+           setHasMore(nextHasMore);
+        } else {
+           setHasMore(false);
         }
       } else {
         // Direct Search
-        const results = await searchMusic(q, activeSource, 1, controller.signal);
+        const { songs: results, hasMore: nextHasMore } = await searchMusic(q, activeSource, 1, controller.signal);
         setSongs(results);
-        setHasMore(results.length === RESULTS_LIMIT);
+        setHasMore(nextHasMore);
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
@@ -100,11 +103,11 @@ const App: React.FC = () => {
 
       try {
           // Use executedQuery and executedSource to ensure continuity
-          const newSongs = await searchMusic(executedQuery, executedSource, nextPage);
+          const { songs: newSongs, hasMore: nextHasMore } = await searchMusic(executedQuery, executedSource, nextPage);
           
           setSongs(prev => [...prev, ...newSongs]);
           setPage(nextPage);
-          setHasMore(newSongs.length === RESULTS_LIMIT);
+          setHasMore(nextHasMore);
       } catch (e) {
           console.error("Failed to load more songs", e);
       } finally {
@@ -121,6 +124,11 @@ const App: React.FC = () => {
   const handleSuggestionClick = (suggestion: string) => {
       setQuery(suggestion);
       handleSearch(suggestion);
+  };
+
+  const handleAiModeToggle = () => {
+    if (!canUseAi) return;
+    setIsAiMode(prev => !prev);
   };
 
   const playSong = (song: Song) => {
@@ -268,14 +276,25 @@ const App: React.FC = () => {
                     
                     {/* Mode Toggle */}
                     <button 
-                        onClick={() => setIsAiMode(!isAiMode)}
+                        onClick={handleAiModeToggle}
+                        disabled={!canUseAi}
                         className={`px-4 py-4 border-r border-white/10 flex items-center gap-2 transition-colors ${
-                            isAiMode ? 'bg-purple-500/10 text-purple-400' : 'hover:bg-white/5 text-slate-400'
+                            !canUseAi
+                            ? 'text-slate-600 cursor-not-allowed'
+                            : isAiMode
+                            ? 'bg-purple-500/10 text-purple-400'
+                            : 'hover:bg-white/5 text-slate-400'
                         }`}
-                        title={isAiMode ? "AI Vibe Search Active" : "Standard Keyword Search"}
+                        title={
+                            canUseAi
+                            ? (isAiMode ? "AI Vibe Search Active" : "Standard Keyword Search")
+                            : "Add GEMINI_API_KEY to enable AI vibe search"
+                        }
                     >
                         <Sparkles size={18} className={isAiMode ? "animate-pulse" : ""} />
-                        <span className="text-sm font-medium hidden sm:inline">{isAiMode ? 'AI Mode' : 'Search'}</span>
+                        <span className="text-sm font-medium hidden sm:inline">
+                            {canUseAi ? (isAiMode ? 'AI Mode' : 'Search') : 'AI Locked'}
+                        </span>
                     </button>
 
                     <input
@@ -311,6 +330,12 @@ const App: React.FC = () => {
                         </button>
                     ))}
                 </div>
+            )}
+
+            {!canUseAi && (
+                <p className="text-center text-xs text-amber-300/80">
+                    Add `GEMINI_API_KEY` to enable AI vibe search and song trivia.
+                </p>
             )}
         </div>
 
