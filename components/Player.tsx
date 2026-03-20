@@ -2,9 +2,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { PlayerState, Song } from '../types';
 import { getSongUrl, getSongCover } from '../services/musicApi';
-import { getMusicTrivia } from '../services/geminiService';
 import { PLACEHOLDER_COVER } from '../constants';
-import { Play, Pause, Volume2, SkipBack, SkipForward, Loader2, Info } from 'lucide-react';
+import { Play, Pause, Volume2, SkipBack, SkipForward, Loader2 } from 'lucide-react';
 
 interface PlayerProps {
   currentSong: Song | null;
@@ -23,8 +22,6 @@ export const Player: React.FC<PlayerProps> = ({ currentSong, onNext, onPrev }) =
     audioUrl: null,
     isLoading: false,
   });
-  const [trivia, setTrivia] = useState<string>('');
-  const [showTrivia, setShowTrivia] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string>(PLACEHOLDER_COVER);
 
   // Sync volume whenever it changes
@@ -55,7 +52,6 @@ export const Player: React.FC<PlayerProps> = ({ currentSong, onNext, onPrev }) =
         progress: 0,
         duration: 0
       }));
-      setTrivia('');
       setCoverUrl(PLACEHOLDER_COVER);
       
       try {
@@ -63,11 +59,6 @@ export const Player: React.FC<PlayerProps> = ({ currentSong, onNext, onPrev }) =
         getSongCover(currentSong, controller.signal).then(url => {
             if (isActive) setCoverUrl(url);
         }).catch(() => {});
-
-        // Fetch Trivia (non-blocking) - Gemini service doesn't use the music api rate limiter
-        getMusicTrivia(currentSong.name, currentSong.artist.join(', ')).then(t => {
-            if (isActive) setTrivia(t);
-        });
 
         // Fetch Audio URL with cancel signal
         const url = await getSongUrl(currentSong, controller.signal);
@@ -193,7 +184,7 @@ export const Player: React.FC<PlayerProps> = ({ currentSong, onNext, onPrev }) =
         
         {/* Track Info */}
         <div className="flex items-center gap-4 w-full md:w-1/4">
-          <div className="relative group">
+          <div className="relative">
             <div className={`w-14 h-14 rounded-md overflow-hidden bg-slate-800 ${playerState.isPlaying ? 'animate-[spin_10s_linear_infinite]' : ''}`}>
                  <img 
                     src={coverUrl} 
@@ -202,15 +193,6 @@ export const Player: React.FC<PlayerProps> = ({ currentSong, onNext, onPrev }) =
                     onError={(e) => { e.currentTarget.src = PLACEHOLDER_COVER; }}
                  />
             </div>
-            {trivia && (
-                <button 
-                    className="absolute -top-2 -right-2 bg-blue-500 rounded-full p-1 shadow-lg hover:scale-110 transition-transform"
-                    onClick={() => setShowTrivia(!showTrivia)}
-                    title="AI Trivia"
-                >
-                    <Info size={12} />
-                </button>
-            )}
           </div>
           
           <div className="flex-1 min-w-0">
@@ -218,13 +200,6 @@ export const Player: React.FC<PlayerProps> = ({ currentSong, onNext, onPrev }) =
              <div className="text-xs text-slate-400 truncate">{currentSong.artist.join(', ')}</div>
           </div>
         </div>
-
-        {/* Trivia Popup */}
-        {showTrivia && trivia && (
-            <div className="absolute bottom-24 left-4 md:left-20 bg-black/90 p-3 rounded-lg max-w-xs text-sm text-blue-200 border border-blue-500/30 animate-fade-in z-50">
-                <p>✨ {trivia}</p>
-            </div>
-        )}
 
         {/* Controls */}
         <div className="flex flex-col items-center w-full md:w-2/4 gap-2">

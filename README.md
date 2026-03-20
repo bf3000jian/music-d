@@ -2,19 +2,32 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# Music D
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/drive/1S1jmNPPS4rmpFHqrOZgqb3ck-qeYlOn5
+This is a Vite + React music search app that can be deployed as a static site.
 
 ## Run Locally
 
 **Prerequisites:**  Node.js
 
-
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Run the app:
    `npm run dev`
+
+## Build
+
+Run:
+`npm run build`
+
+The production files will be generated in:
+`dist`
+
+## Deploy to Cloudflare Pages
+
+Use these settings:
+
+1. Build command:
+   `npm run build`
+2. Build output directory:
+   `dist`

@@ -1,12 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { Song } from './types';
 import { searchMusic } from './services/musicApi';
-import { getSmartSearchTerms, isGeminiConfigured } from './services/geminiService';
 import { SongList } from './components/SongList';
 import { Player } from './components/Player';
 import { RateLimitIndicator } from './components/RateLimitIndicator';
 import { SOURCES, DEFAULT_SOURCE, SUPPORTED_SOURCES } from './constants';
-import { Search, Sparkles, Loader2, Music2, Plus, X, ChevronDown } from 'lucide-react';
+import { Search, Loader2, Music2, Plus, X, ChevronDown } from 'lucide-react';
 
 const App: React.FC = () => {
   const [query, setQuery] = useState('');
@@ -20,8 +19,6 @@ const App: React.FC = () => {
   // Search State
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isAiMode, setIsAiMode] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [searchTriggered, setSearchTriggered] = useState(false);
 
   // Pagination State
@@ -35,7 +32,6 @@ const App: React.FC = () => {
 
   // Keep track of the current search request to cancel it if a new one starts
   const searchAbortControllerRef = useRef<AbortController | null>(null);
-  const canUseAi = isGeminiConfigured;
 
   const handleSearch = async (overrideQuery?: string) => {
     const q = overrideQuery || query;
@@ -51,7 +47,6 @@ const App: React.FC = () => {
     setIsLoading(true);
     setSearchTriggered(true);
     setSongs([]);
-    setAiSuggestions([]);
     
     // Reset Pagination
     setPage(1);
@@ -62,31 +57,9 @@ const App: React.FC = () => {
     setExecutedQuery(q);
 
     try {
-      if (isAiMode && !overrideQuery && canUseAi) {
-        // AI Vibe Search
-        const suggestions = await getSmartSearchTerms(q);
-        if (controller.signal.aborted) return;
-
-        setAiSuggestions(suggestions);
-        if (suggestions.length > 0) {
-           // Automatically search for the first suggestion
-           const firstSuggestion = suggestions[0];
-           setExecutedQuery(firstSuggestion); // Update executed query to the actual term used
-           const { songs: results, hasMore: nextHasMore } = await searchMusic(firstSuggestion, activeSource, 1, controller.signal);
-           setSongs(results);
-           setHasMore(nextHasMore);
-        } else {
-           // Fallback to plain search without pretending Gemini suggested the raw prompt.
-           const { songs: results, hasMore: nextHasMore } = await searchMusic(q, activeSource, 1, controller.signal);
-           setSongs(results);
-           setHasMore(nextHasMore);
-        }
-      } else {
-        // Direct Search
-        const { songs: results, hasMore: nextHasMore } = await searchMusic(q, activeSource, 1, controller.signal);
-        setSongs(results);
-        setHasMore(nextHasMore);
-      }
+      const { songs: results, hasMore: nextHasMore } = await searchMusic(q, activeSource, 1, controller.signal);
+      setSongs(results);
+      setHasMore(nextHasMore);
     } catch (error: any) {
       if (error.name !== 'AbortError') {
           console.error(error);
@@ -122,16 +95,6 @@ const App: React.FC = () => {
     if (e.key === 'Enter') {
       handleSearch();
     }
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-      setQuery(suggestion);
-      handleSearch(suggestion);
-  };
-
-  const handleAiModeToggle = () => {
-    if (!canUseAi) return;
-    setIsAiMode(prev => !prev);
   };
 
   const playSong = (song: Song) => {
@@ -198,10 +161,10 @@ const App: React.FC = () => {
                     <Music2 size={32} className="text-white" />
                 </div>
                 <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 tracking-tight">
-                    MuseAI
+                    Music D
                 </h1>
             </div>
-            <p className="text-slate-400">Smart music discovery powered by Gemini</p>
+            <p className="text-slate-400">Search, stream, and download from multiple music sources</p>
         </header>
 
         {/* Search & Controls */}
@@ -274,38 +237,20 @@ const App: React.FC = () => {
 
             {/* Search Input */}
             <div className="relative group">
-                <div className={`absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500 to-blue-500 opacity-20 group-hover:opacity-40 blur transition-opacity ${isAiMode ? 'opacity-50 blur-md' : ''}`}></div>
+                <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500 to-blue-500 opacity-20 group-hover:opacity-40 blur transition-opacity"></div>
                 <div className="relative flex items-center bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl">
-                    
-                    {/* Mode Toggle */}
-                    <button 
-                        onClick={handleAiModeToggle}
-                        disabled={!canUseAi}
-                        className={`px-4 py-4 border-r border-white/10 flex items-center gap-2 transition-colors ${
-                            !canUseAi
-                            ? 'text-slate-600 cursor-not-allowed'
-                            : isAiMode
-                            ? 'bg-purple-500/10 text-purple-400'
-                            : 'hover:bg-white/5 text-slate-400'
-                        }`}
-                        title={
-                            canUseAi
-                            ? (isAiMode ? "AI Vibe Search Active" : "Standard Keyword Search")
-                            : "Add GEMINI_API_KEY to enable AI vibe search"
-                        }
-                    >
-                        <Sparkles size={18} className={isAiMode ? "animate-pulse" : ""} />
-                        <span className="text-sm font-medium hidden sm:inline">
-                            {canUseAi ? (isAiMode ? 'AI Mode' : 'Search') : 'AI Locked'}
-                        </span>
-                    </button>
+
+                    <div className="px-4 py-4 border-r border-white/10 flex items-center gap-2 text-slate-400">
+                        <Search size={18} />
+                        <span className="text-sm font-medium hidden sm:inline">Search</span>
+                    </div>
 
                     <input
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder={isAiMode ? "Describe your vibe (e.g., 'Late night coding session')..." : "Search for song, artist, album..."}
+                        placeholder="Search for song, artist, album..."
                         className="flex-1 bg-transparent px-4 py-4 outline-none placeholder:text-slate-600 text-lg"
                     />
 
@@ -318,28 +263,6 @@ const App: React.FC = () => {
                     </button>
                 </div>
             </div>
-            
-            {/* AI Suggestions Chips */}
-            {isAiMode && aiSuggestions.length > 0 && (
-                <div className="flex flex-wrap gap-2 justify-center animate-fade-in">
-                    <span className="text-xs text-slate-500 w-full text-center mb-1">Gemini suggests:</span>
-                    {aiSuggestions.map((term, idx) => (
-                        <button
-                            key={idx}
-                            onClick={() => handleSuggestionClick(term)}
-                            className="px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm hover:bg-purple-500/20 transition-colors"
-                        >
-                            {term}
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            {!canUseAi && (
-                <p className="text-center text-xs text-amber-300/80">
-                    Add `GEMINI_API_KEY` to enable AI vibe search and song trivia.
-                </p>
-            )}
         </div>
 
         {/* Results */}
