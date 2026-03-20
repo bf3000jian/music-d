@@ -68,15 +68,18 @@ const App: React.FC = () => {
         if (controller.signal.aborted) return;
 
         setAiSuggestions(suggestions);
-        // Automatically search for the first suggestion
         if (suggestions.length > 0) {
+           // Automatically search for the first suggestion
            const firstSuggestion = suggestions[0];
            setExecutedQuery(firstSuggestion); // Update executed query to the actual term used
            const { songs: results, hasMore: nextHasMore } = await searchMusic(firstSuggestion, activeSource, 1, controller.signal);
            setSongs(results);
            setHasMore(nextHasMore);
         } else {
-           setHasMore(false);
+           // Fallback to plain search without pretending Gemini suggested the raw prompt.
+           const { songs: results, hasMore: nextHasMore } = await searchMusic(q, activeSource, 1, controller.signal);
+           setSongs(results);
+           setHasMore(nextHasMore);
         }
       } else {
         // Direct Search

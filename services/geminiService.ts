@@ -46,7 +46,7 @@ const getGeminiClient = async (): Promise<GeminiClient | null> => {
 export const getSmartSearchTerms = async (userPrompt: string): Promise<string[]> => {
   const [ai, gemini] = await Promise.all([getGeminiClient(), loadGeminiModule()]);
   if (!ai || !gemini) {
-    return [userPrompt];
+    return [];
   }
 
   try {
@@ -72,14 +72,14 @@ export const getSmartSearchTerms = async (userPrompt: string): Promise<string[]>
     });
 
     const jsonText = response.text;
-    if (!jsonText) return [userPrompt];
+    if (!jsonText) return [];
     
     const terms = JSON.parse(jsonText);
-    return Array.isArray(terms) ? terms : [userPrompt];
+    return Array.isArray(terms) ? terms : [];
 
   } catch (error) {
     console.error("Gemini smart search failed:", error);
-    return [userPrompt]; // Fallback to raw input
+    return [];
   }
 };
 
